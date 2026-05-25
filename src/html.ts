@@ -39,6 +39,9 @@ document.head.append(
       --background: #eee;
     }
   }
+  textarea:focus {
+    outline: none;
+  }
 `))
 
 

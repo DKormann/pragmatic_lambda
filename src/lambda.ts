@@ -24,8 +24,9 @@ export const a = (f:Term,...xs:Term[]): Term => xs.reduce((f,x)=>({$app:[f,x]}),
 
 const kal = (f:Term, env:Term[]):Term => mat<Term>(f,()=>f, ()=>f,(f,x)=> a(kal(f, env), kal(x, env)), v=> env[v]!)
 
-export let fake_builtins = { store: (k:Term,v:Term)=>k, load: (k:Term)=>k }
+export let fake_builtins = { store: (k:Term,v:Term)=>k, load: (k:Term)=>k, secret: (f:Term, arg:Term)=>a(f, "xxx", arg)}
 export const proc = (code: string):Fun => {
+  code = String(code)
   let size:number = Function(...Object.keys(fake_builtins),"return " + code)(...Object.values(fake_builtins)).length
   return {$fun: [size, "proc", code]}
 }
