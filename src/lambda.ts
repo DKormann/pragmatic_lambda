@@ -1,28 +1,11 @@
 import {hash} from "./hash"
 
-
-export const store = (k:Term, v:Term)=> {
-  localStorage.setItem(hashTerm(k), JSON.stringify(v))
-  return "ok"
-}
-
-export const load = (k:Term): Term | undefined =>{
-  let res = localStorage.getItem(hashTerm(k))
-  return res ? JSON.parse(res) : undefined
-}
-
 export const hashTerm = (t:Term):string =>mat(t,
   d=> hash(JSON.stringify(d)),
   (n,t,b)=> hash("lam" + n + t + hashTerm(b)),
   (f,x) => hash("app" + hashTerm(f) + hashTerm(x)),
   (v) => hash("var" + v)
 )
-
-export const reset = ()=> localStorage.clear()
-let runtimeKey = "s3cr3t"
-const secret = (fn:Term, arg:Term):Term=> $(fn, hash(hashTerm(fn) + runtimeKey), arg)
-
-export const builtins : {[key:string]: Function}  = {store, load, secret }
 
 type Dat = string | number | Dat[]
 type Fun = {$fun: [number, "proc", string] | [number, "lam", Term]}
@@ -36,26 +19,49 @@ export const mat = <T>(w:Term, d:(d:Dat)=>T, f:(n:number, tag:"proc" | "lam", b:
 
 const mklam = (arity: number, body: Term):Fun => ({$fun: [arity, "lam", body]})
 
-export const mkproc = (code: string): Lam =>Function(...Object.keys(builtins),"return " + code)(...Object.values(builtins))
-export const proc = (code:string):Fun => ({$fun: [ mkproc(code).length, "proc", code]})
-
 
 export const a = (f:Term,...xs:Term[]): Term => xs.reduce((f,x)=>({$app:[f,x]}), f)
 
 const kal = (f:Term, env:Term[]):Term => mat<Term>(f,()=>f, ()=>f,(f,x)=> a(kal(f, env), kal(x, env)), v=> env[v]!)
 
+export let fake_builtins = { store: (k:Term,v:Term)=>k, load: (k:Term)=>k }
+export const proc = (code: string):Fun => {
+  let size:number = Function(...Object.keys(fake_builtins),"return " + code)(...Object.values(fake_builtins)).length
+  return {$fun: [size, "proc", code]}
+}
 
-export const $ = (v:Term, ...args:Term[]):Term=>mat<Term>(v,
-  d=>a(d, ...args),
-  (n,t,b)=>
-    (n>args.length) ? a(v, ...args)
-    : $(
-      (t=="proc") ? mkproc(b as string) ( ...args.slice(0,n).map(x=>$(x)))
-      : kal(b, args.slice(0, n).map(x=>$(x))), ...args.slice(n).map(x=>$(x))
-    ),
-  (f,x)=> $(f,x,...args),
-  ()=>a(v, ...args.map(x=>$(x)))
-)
+export const run = (t:Term, store: (k:string,v:string)=>void, load: (k:string)=>string | undefined, runtimeKey: string) :Term =>{
+
+  const mkproc = (code: string): Lam =>Function(...Object.keys(builtins),"return " + code)(...Object.values(builtins))
+
+  const secret = (fn:Term, arg:Term):Term=> a(fn, hash(hashTerm(fn) + runtimeKey), arg)
+
+  const builtins : {[key:string]: Lam}  = {
+    store: (k:Term, v:Term)=> {
+      let ks = hashTerm(k)
+      store(ks, JSON.stringify(v))
+      return "ok"
+    },
+    load: (k:Term): Term =>{
+      let ks = hashTerm(k)
+      let res = load(ks)
+      return res ? JSON.parse(res) : 0
+    },
+    secret }
+
+  const $ = (v:Term, ...args:Term[]):Term=>mat<Term>(v,
+    d=>a(d, ...args),
+    (n,t,b)=>
+      (n>args.length) ? a(v, ...args)
+      : $(
+        (t=="proc") ? mkproc(b as string) ( ...args.slice(0,n).map(x=>$(x)))
+        : kal(b, args.slice(0, n).map(x=>$(x))), ...args.slice(n).map(x=>$(x))
+      ),
+    (f,x)=> $(f,x,...args),
+    ()=>a(v, ...args.map(x=>$(x)))
+  )
+  return $(t)
+}
 
 
 export const fmt = (v:Term):string=>{
@@ -87,7 +93,11 @@ export const lam = (f: Lam):Term =>{
   let vmap = new Map<Var, Var> ()
   let go =(t:Term):Term=> mat<Term>(t,
     ()=>t, ()=> t, (a,b)=> ({$app:[go(a), go(b)] }),
-    () => vars.includes(t as Var) ? t : vmap.getOrInsertComputed(t as Var, ()=> ({$var: vmap.size } as Var))!
+    ()=>{
+      if (vars.includes(t as Var)) return t
+      if (!vmap.has(t as Var)) vmap.set(t as Var, {$var: vmap.size} as Var)
+      return vmap.get(t as Var)!
+    }
   )
 
   let bod = f(...vars)

@@ -12,6 +12,6 @@
     "vite": "^7.1.5"
   },
   "dependencies": {
-    "pragmatic_lambda": "."
+    "spacetimedb": "^2.1.0"
   }
 }

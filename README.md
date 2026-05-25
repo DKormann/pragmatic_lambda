@@ -1,15 +1,22 @@
-# pragmatic_lambda
+# lambda world
 
-To install dependencies:
+a pragmatic take on homoiconic scripting in JS context.
+heavy inspired by [PLAN](https://github.com/xocore-tech/PLAN)
 
-```bash
-bun install
+language definition:
+
+````ts
+type Dat = string | number | Dat[]
+type Fun = {$fun: [number, "proc", string] | [number, "lam", Term]}
+type Var = {$var: number}
+type App = {$app: [Term, Term]}
+export type Term = Dat | Fun | Var | App
 ```
 
-To run:
+The language is based on combinators with embedded JS functions that are supposed to be side effect free.
 
-```bash
-bun run index.ts
-```
+the runtime gives access to 3 special builtin functions
+ - load(key:Term) // loads a term from global DB
+ - store(key:Term, value: Term)
+ - secret(f:Term, val: Term) // runs a function with its own secret fingerprint
 
-This project was created using `bun init` in bun v1.3.9. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

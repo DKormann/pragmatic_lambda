@@ -1,5 +1,18 @@
-import { body, div, h1, html, style } from "./html";
-import { $, a, builtins, fmt, lam, load, proc, store, type Term } from "./lambda";
+import { DbConnection } from "./bindings";
+import { body, div, h1, html, p, style } from "./html";
+import { a, fake_builtins, fmt, lam, proc, type Term } from "./lambda";
+
+
+let send = await new Promise<(query:string)=>Promise<string>>((rs,rj)=>{
+  console.log("Connecting to database...")
+  DbConnection.builder()
+  .withUri("ws://localhost:3000")
+  .withDatabaseName("pragmatic-lambda")
+  .onConnect((c, i, t)=>{
+    console.log("Connected to database, initializing...")
+    rs((query:string)=>c.procedures.runTerm({query}).catch(e=> JSON.stringify({error: e.message || String(e)})))})
+  .onConnectError((ctx, err)=>rj(err)
+).build()})
 
 
 let term = html("textarea")({rows: 1, cols: 50}) as HTMLTextAreaElement;
@@ -8,24 +21,9 @@ let hist :string[] = []
 let hctr = 0
 let v : Term [] = []
 
-style(term, {
-  resize: "none",
-  fontFamily: "monospace",
-  width: "100%",
-})
+style(term, { resize: "none", fontFamily: "monospace", width: "100%" })
 
-let helps = {lam, v, proc, a,  ...Object.fromEntries(Object.entries(builtins).map(([k,v])=>[k, proc(k)]))}
-
-let run = (s:string) => {
-  try{
-    let r = $(Function( ...Object.keys(helps),"return " + s) (...Object.values(helps)) as Term)
-    let f = fmt(r)
-    v.push(r)
-    return f
-  }catch(e){
-    return "Error: " + e
-  }
-}
+let helps = {lam, v, proc, a,  ...Object.fromEntries(Object.entries(fake_builtins).map(([k,v])=>[k, proc(k)]))}
 
 let query = (t:string)=>{
   t = t.trim();
@@ -33,7 +31,19 @@ let query = (t:string)=>{
   hctr = 0
   page.append(t.split("\n").map(line => "$ " + line).join("\n") + "\n\n")
   page.append("v[" + v.length + "]:\n")
-  page.append(run(t) + "\n\n")
+  let rr = p("...")
+  console.log(...Object.keys(helps))
+  let req = Function(...Object.keys(helps), "return " + t)(...Object.values(helps)) as Term
+
+  let l= v.length
+  v.push("...")
+
+  send(JSON.stringify(req)).then(res=>{
+    let trm = JSON.parse(res) as Term
+    rr.textContent = fmt(trm)
+    v[l] = trm
+  })
+  page.append(rr)
   term.value = "";
   term.rows = 1;
 }
