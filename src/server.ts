@@ -6,7 +6,9 @@ import { a, fake_builtins, fmt, lam, proc, type Term } from "./lambda";
 let send = await new Promise<(query:string)=>Promise<string>>((rs,rj)=>{
   console.log("Connecting to database...")
   DbConnection.builder()
-  .withUri("ws://localhost:3000")
+
+  .withUri("wss://maincloud.spacetimedb.com/lexxtract")
+
   .withDatabaseName("pragmatic-lambda")
   .onConnect((c, i, t)=>{
     console.log("Connected to database, initializing...")
